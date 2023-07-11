@@ -1,89 +1,129 @@
 <!DOCTYPE html>
 
 <head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<title>Social Security Analysis</title>
 
 	<!-- CSS -->
 	<link rel="stylesheet" href="socsec.css">
 	<link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.css" />
-  
+	<link rel="stylesheet" href="Resources/jquery-ui.min.css">
+
 	<!--JavaScript-->
 	<script src="socsec.js"></script>
 	<script src="jquery-3.7.0.min.js"></script>
 	<script src="https://code.jquery.com/ui/1.13.1/jquery-ui.min.js" integrity="sha256-eTyxS0rkjpLEo16uXTS0uVCS4815lc40K2iVpWDvdSY=" crossorigin="anonymous"></script>
 	<script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.js"></script>
 
-
+	<script>
+		$( function() {
+		  $( "#tabs" ).tabs({
+			disabled: [ 1, 2, 3, 4 ]
+		  });
+		} );
 	</script>
+	  
 </head>
 
 <body onload="init()">
-	<button class="accordion">Disclaimer</button>
-	<div class="panel">
-		<p>
-			The information provided on this website is for general informational purposes only and should not be
-			considered as professional or personalized financial advice. The content presented here does not take into account your
-			individual financial situation or objectives. Making financial decisions involves inherent risks, and you should consult
-			with a qualified financial advisor or professional before making any financial decisions. While we strive to provide accurate
-			and up-to-date information, we make no representations or warranties of any kind, express or implied, regarding the completeness,
-			accuracy, reliability, suitability, or availability of the information provided on this website. We shall not be held responsible
-			for any losses or damages arising from the use of or reliance on the information presented here. By accessing and using this
-			website, you acknowledge and agree to these terms and conditions.
-		</p>
-	</div>
+		<div id="tabs">
+		<ul>
+		  <li><a href="#Overview">Overview</a></li>
+		  <li><a href="#Summary">Summary</a></li>
+		  <li><a href="#TaxesPaid">Taxes Paid</a></li>
+		  <li><a href="#Earnings">Earnings History</a></li>
+		  <li><a href="#Benefits">Estimated Benefits</a></li>
+		</ul>
+		<div id="Overview">
+			<h2>Overview</h2>
+			<!-- <div>
+				<p>Welcome to SocialSecuTrack.com, the leading online platform that empowers users to effortlessly analyze their personal social security payment history and gain valuable insights into future payout projections. Our user-friendly interface and advanced algorithms enable you to securely access and evaluate your social security records, ensuring accurate and comprehensive information at your fingertips. With SocialSecuTrack.com, you can confidently plan for the future, make informed financial decisions, and optimize your retirement strategy based on real-time data. Start exploring your social security payment history today and secure a prosperous future with ease.</p>
+			</div> -->
+			
+			<p class="buttonLabel">Select a Social Security XML file</p>
+			<input type="file" id="xmlFileInput" accept='.xml' onchange='openXMLFile(event)' class="button"/>
 
-	<button class="accordion">Privacy</button>
-	<div class="panel">
-		<p>
-			We do not store any user data on our servers. We believe in safeguarding your personal information and respecting your right to privacy. When you browse our website, no personally identifiable information is collected, tracked, or retained by us. We adhere to stringent data protection practices and do not engage in any data storage activities that could compromise your privacy. Your trust is of utmost importance to us, and we are committed to maintaining a safe and secure online environment.
-		</p>
-	</div>
-	
-	<button class="accordion">Instructions</button>
-	<div class="panel">
-	  <p class="instructions">Go to <a href="https://www.ssa.gov/" target="_blank">ssa.gov</a> and sign into your Social Security account (create a new account if you haven't created one already).</p>
-	  <p class="instructions">Click on the "Your Social Security Statement" link.</p>
-	  <p class="example"><img src="ysss.png" alt="Your Social Security example"></p>
-	  <p class="instructions">Click on the "Download Statement Data as XML" link and save it somewhere on your device.</p>
-	  <p  class="example"><img src="xml.png" alt="Download Statement Data as an XML file example"></p>
-	  <p class="instructions">Log out of the ssa.gov site (if you wish).</p>
-	  <p class="instructions">Below, click on the "Choose File" button below and browse to the XML file you downloaded above.</p>
-	</div>
-	
-	<p class="buttonLabel">Select a Social Security XML file</p>
-	<input type="file" id="xmlFileInput" accept='.xml' onchange='openXMLFile(event)' class="button"/><br />
-	<hr id="outputStart">
-	<div id="statistics">
-		<p>Social Security is based on the highest <span class="number">35</span> years of inflation adjusted earnings.  You have <span class="number" id="incomeYears"></span> years of recorded income.</p>
-		<p id="notMet35">Because you have <span id="numYearsWorked" class="number"></span> years recorded, currently <span id="zeroYears" class="number"></span> years are recored as having <span class="number">$0</span> earnings.</p>
-		<p id="exceeded">Your earnings met or exceeded the maximum taxable earnings <span class="number" id="exceededCount"></span> times.</p>
-		<p>Your highest earning year was <span id="highestYear" class="number"></span> when you earned <span id="highestedIncome" class="number"></span></p>
-		<p id="highestInflation">Inflation adjusted, your highest earning year was <span class="number" id="highestYearAdjusted"></span> when you earned <span id="highestedIncomeAdjusted" class="number"></span></p>
-		<p>In total, you earned <span class="number" id="totalIncome"></span> (<span class="number" id="totalIncomeAdjusted"></span> inflation adjusted)</p>
-		<p>You are eligible to collect Social Security at age <span class="number">62</span> on <span class="number" id="eligible62Date"></span><span class="number" id="eligible62Diff"></span></p>
-		<p>The maximum possible Social Security is at age <span class="number">70</span> on <span class="number" id="eligible70Date"></span><span class="number" id="eligible70Diff"></span></p>
-	</div>
-	<br /><br />
-	
-	<div class="tableDiv">
-		<table id="taxTable" class="taxTable hover">
-			<caption>Taxes Paid</caption>
-			<thead>
-				<tr><th></th><th>Fica Tax Paid</th><th>Medicare Tax Paid</th><th>Total</th></tr>
-			</thead>
-			<tbody>
-				<tr><th>By Employee</th><td id="fixaemployee"></td><td id="medicareemployee"></td><td id="employeeTotal"></td></tr>
-				<tr><th>By Employer(s)</th><td id="ficaEmployer"></td><td id="medicareEmployer"></td><td id="employerTotal"></td></tr>
-				<tr><th>Total</th><td id="fixaTotal"></td><td id="medicareTotal"></td><td id="grandTotal"></td></tr>
-			</tbody>
-		</table>
-	</div>
+			<button class="accordion">Instructions</button>
+			<div class="panel">
+				<p class="instructions">Go to <a href="https://www.ssa.gov/" target="_blank">ssa.gov</a> and sign into your Social Security account (create a new account if you haven't created one already).</p>
+				<p class="instructions">Click on the "Your Social Security Statement" link.</p>
+				<p class="example"><img src="ysss.png" alt="Your Social Security example"></p>
+				<p class="instructions">Click on the "Download Statement Data as XML" link and save it somewhere on your device.</p>
+				<p  class="example"><img src="xml.png" alt="Download Statement Data as an XML file example"></p>
+				<p class="instructions">Log out of the ssa.gov site (if you wish).</p>
+				<p class="instructions">Below, click on the "Choose File" button below and browse to the XML file you downloaded above.</p>
+			</div>
 
-	<div class="tableDiv">
-		<table id="earningsTable" class="hover">
-		</table>
-	</div>
+			<button class="accordion">Disclaimer</button>
+			<div class="panel">
+				<p>
+					The information provided on this website is for general informational purposes only and should not be
+					considered as professional or personalized financial advice. The content presented here does not take into account your
+					individual financial situation or objectives. Making financial decisions involves inherent risks, and you should consult
+					with a qualified financial advisor or professional before making any financial decisions. While we strive to provide accurate
+					and up-to-date information, we make no representations or warranties of any kind, express or implied, regarding the completeness,
+					accuracy, reliability, suitability, or availability of the information provided on this website. We shall not be held responsible
+					for any losses or damages arising from the use of or reliance on the information presented here. By accessing and using this
+					website, you acknowledge and agree to these terms and conditions.
+				</p>
+			</div>
 
+			<button class="accordion">Privacy</button>
+			<div class="panel">
+				<p>
+					We do not store any user data on our servers.
+					We believe in safeguarding your personal information and respecting your right to privacy.
+					When you browse our website, no personally identifiable information is collected, tracked, or retained by us.
+					We adhere to stringent data protection practices and do not engage in any data storage activities that could compromise your privacy.
+					Your trust is of utmost importance to us, and we are committed to maintaining a safe and secure online environment.
+				</p>
+			</div>
+			
+		</div>
+		<div id="Summary">
+			<h2>Summary</h2>
+			<div id="statistics">
+				<p>Social Security is based on the highest <span class="number">35</span> years of average wage index adjusted earnings.  You have <span class="number" id="incomeYears"></span> years of recorded income.</p>
+				<p id="notMet35">Because you have <span id="numYearsWorked" class="number"></span> years recorded, currently <span id="zeroYears" class="number"></span> years are recored as having <span class="number">$0</span> earnings.</p>
+				<p id="exceeded">Your earnings met or exceeded the maximum taxable earnings <span class="number" id="exceededCount"></span> times.</p>
+				<p>Your highest earning year was <span id="highestYear" class="number"></span> when you earned <span id="highestedIncome" class="number"></span>.</p>
+				<p id="highestInflation">Inflation adjusted, your highest earning year was <span class="number" id="highestYearAdjusted"></span> when you earned <span id="highestedIncomeAdjusted" class="number"></span>.</p>
+				<p id="minInfo">Your lowest earning year of the top 35 was <span class="number" id="lowestYear"></span> where you earned <span class="number" id="lowestIncome"></span> (inflation adjusted).</p>
+				<br />
+				<p>In total, you earned <span class="number" id="totalIncome"></span> (<span class="number" id="totalIncomeAdjusted"></span> inflation adjusted).</p>
+				<p>You are eligible to collect Social Security at age <span class="number">62</span> on <span class="number" id="eligible62Date"></span><span class="number" id="eligible62Diff"></span>.</p>
+				<p>The maximum possible Social Security payments is at age <span class="number">70</span> on <span class="number" id="eligible70Date"></span><span class="number" id="eligible70Diff"></span>.</p>
+			</div>
+		</div>
+		
+		<div id="TaxesPaid" class="tableDiv">
+			<h2>Social Security Taxes Paid</h2>
+			<table id="taxTable" class="taxTable hover">
+				<caption>Taxes Paid</caption>
+				<thead>
+					<tr><th></th><th>Fica Tax Paid</th><th>Medicare Tax Paid</th><th>Total</th></tr>
+				</thead>
+				<tbody>
+					<tr><th>By Employee</th><td id="fixaemployee"></td><td id="medicareemployee"></td><td id="employeeTotal"></td></tr>
+					<tr><th>By Employer(s)</th><td id="ficaEmployer"></td><td id="medicareEmployer"></td><td id="employerTotal"></td></tr>
+					<tr><th>Total</th><td id="fixaTotal"></td><td id="medicareTotal"></td><td id="grandTotal"></td></tr>
+				</tbody>
+			</table>
+		</div>
+
+		<div class="tableDiv" id="Earnings">
+			<h2>Earnings History</h2>
+			<table id="earningsTable" class="hover">
+			</table>
+		</div>
+
+		<div class="tableDiv" id="Benefits">
+			<h2>Estimated Benefits</h2>
+			<table id="estimatedBenefits" class="hover">
+			</table>
+		</div>
+</div>
 </body>
 
 </html>
