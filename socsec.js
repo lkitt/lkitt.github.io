@@ -1,25 +1,14 @@
 var tableInitialized = false;
 
-function init()
-{
-    // Implement the accordian feature
-    var acc = document.getElementsByClassName("accordion");
-    var i;
-
-    for (i = 0; i < acc.length; i++)
-    {
-        acc[i].addEventListener("click", function()
-        {
-            this.classList.toggle("active");
-            var panel = this.nextElementSibling;
-            if (panel.style.maxHeight) {
-                panel.style.maxHeight = null;
-            } else {
-                panel.style.maxHeight = panel.scrollHeight + "px";
-            } 
-        });
-    }
-}
+const firstCut = 1115;
+const secondCut = 6721;
+var lastAWIYear = 0;
+var birthDate;
+var monthMultiplier = 12;
+var earningsHistory = new Map();
+var minSS = 1000000;
+var maxSS = 0;
+var lastYear = 0;
 
 const formatter7 = new Intl.NumberFormat('en-US', {
     minimumFractionDigits: 0,
@@ -40,6 +29,7 @@ const inflationMap = new Map([
     [2020,1.2], [2021,4.7], [2022,8.0],
 ]);
 
+// https://www.ssa.gov/oact/cola/AWI.html
 const averageWage = new Map([
     [1951,2799.16], [1952,2973.32], [1953,3139.44], [1954,3155.64], [1955,3301.44], [1956,3532.36], [1957,3641.72], [1958,3673.80], [1959,3855.80],
     [1960,4007.12], [1961,4086.76], [1962,4291.40], [1963,4396.64], [1964,4576.32], [1965,4658.72], [1966,4938.36], [1967,5213.44], [1968,5571.76], [1969,5893.76],
@@ -48,19 +38,9 @@ const averageWage = new Map([
     [1990,21027.98], [1991,21811.60], [1992,22935.42], [1993,23132.67], [1994,23753.53], [1995,24705.66], [1996,25913.90], [1997,27426.00], [1998,28861.44], [1999,30469.84],
     [2000,32154.82], [2001,32921.92], [2002,33252.09], [2003,34064.95], [2004,35648.55], [2005,36952.94], [2006,38651.41], [2007,40405.48], [2008,41334.97], [2009,40711.61],
     [2010,41673.83], [2011,42979.61], [2012,44321.67], [2013,44888.16], [2014,46481.52], [2015,48098.63], [2016,48642.15], [2017,50321.89], [2018,52145.80], [2019,54099.99],
-    [2020,55628.60], [2021,60575.07],
+    [2020,55628.60], [2021,60575.07], [2022,60575.07],
 ]);
 
-//https://www.ssa.gov/oact/cola/AWI.html
-const wageIndices = new Map([
-    [1962,14.1154565], [1963,13.7775824], [1964,13.2366334], [1965,13.0025136], [1966,12.2662321], [1967,11.6190212], [1968,10.8718017], [1969,10.2778311],
-    [1970,9.7919043],  [1971,9.3234299],  [1972,8.4912767],  [1973,7.9912654],  [1974,7.5428814],  [1975,7.0183793],  [1976,6.5653499],  [1977,6.1941246], [1978,5.7384329], [1979,5.2768223],
-    [1980,4.8407930],  [1981,4.3980709],  [1982,4.1685811],  [1983,3.9749404],  [1984,3.7542490],  [1985,3.6008342],  [1986,3.4970384],  [1987,3.2873870], [1988,3.1330788], [1989,3.0137525],
-    [1990,2.8806890],  [1991,2.7771952],  [1992,2.6411145],  [1993,2.6185940],  [1994,2.5501502],  [1995,2.4518701],  [1996,2.3375513],  [1997,2.2086732], [1998,2.0988236], [1999,1.9880337],
-    [2000,1.8838566],  [2001,1.8399616],  [2002,1.8216921],  [2003,1.7782228],  [2004,1.6992296],  [2005,1.6392490],  [2006,1.5672150],  [2007,1.4991796], [2008,1.4654679], [2009,1.4879065],
-    [2010,1.4535518],  [2011,1.4093909],  [2012,1.3667145],  [2013,1.3494665],  [2014,1.3032076],  [2015,1.2593928],  [2016,1.2453206],  [2017,1.2037519], [2018,1.1616481], [2019,1.1196873],
-    [2020,1.0889195],  [2021,1.0000000],  [2022,1.0000000],
-  ]);
   
 // https://www.ssa.gov/oact/cola/cbb.html
 const maxTaxedIncome = new Map([
@@ -83,6 +63,21 @@ class YearInfo {
         this.medicare = medicare;
         this.adjMed = medicare;
         this.rank = 1;
+
+        // The wage index is 1 from age 60 and later
+        var wageIndex = 1;
+        let curAverageWage = averageWage.get(year);
+
+        // If the year is less than two years ago, we can calculate the wage index
+        if ( year <= new Date().getFullYear() - 2 )
+        {
+            let finalAverageWage = averageWage.get(lastAWIYear);
+            wageIndex = finalAverageWage / curAverageWage;
+        }
+        this.wageIndex = wageIndex;
+        this.ficaAdjusted = wageIndex * fica;
+        if ( year > lastYear ) lastYear = year;
+
     }
 
     setAdjustedMedicare(adjMed) {
@@ -94,68 +89,235 @@ class YearInfo {
     }
 }
 
-var earningsHistory = new Map();
-
-function createEstimatedBeniftsTable(xmlDoc)
+function init()
 {
-    let age62bens = getEstimatedBenefit(xmlDoc, "osss:Age62RetirementEstimate");
-    let age63bens = getEstimatedBenefit(xmlDoc, "osss:Age63RetirementEstimate");
-    let age64bens = getEstimatedBenefit(xmlDoc, "osss:Age64RetirementEstimate");
-    let age65bens = getEstimatedBenefit(xmlDoc, "osss:Age65RetirementEstimate");
-    let age66bens = getEstimatedBenefit(xmlDoc, "osss:Age66RetirementEstimate");
-    let age67bens = getEstimatedBenefit(xmlDoc, "osss:Age67RetirementEstimate");
-    let age68bens = getEstimatedBenefit(xmlDoc, "osss:Age68RetirementEstimate");
-    let age69bens = getEstimatedBenefit(xmlDoc, "osss:Age69RetirementEstimate");
-    let age70bens = getEstimatedBenefit(xmlDoc, "osss:Age70RetirementEstimate");
+    // Implement the accordian feature
+    var acc = document.getElementsByClassName("accordion");
+    var i;
 
-    let userInformation = xmlDoc.getElementsByTagName("osss:UserInformation");
-    let birthDate;
-    let userName = "";
-    if ( userInformation.length === 1 ) {
-        let bdate = userInformation[0].getElementsByTagName("osss:DateOfBirth");
-        birthDate = new Date(bdate[0].childNodes[0].data);
+    for (i = 0; i < acc.length; i++)
+    {
+        acc[i].addEventListener("click", function()
+        {
+            this.classList.toggle("active");
+            var panel = this.nextElementSibling;
+            if (panel.style.maxHeight) {
+                panel.style.maxHeight = null;
+            } else {
+                panel.style.maxHeight = panel.scrollHeight + "px";
+            }
+        });
+    }
+}
 
-        // Figure out the year user turns various ages
-        var year62 = (new Date(birthDate.getFullYear() + 62, birthDate.getMonth(), birthDate.getDay())).getFullYear();
-        var year63 = (new Date(birthDate.getFullYear() + 63, birthDate.getMonth(), birthDate.getDay())).getFullYear();
-        var year64 = (new Date(birthDate.getFullYear() + 64, birthDate.getMonth(), birthDate.getDay())).getFullYear();
-        var year65 = (new Date(birthDate.getFullYear() + 65, birthDate.getMonth(), birthDate.getDay())).getFullYear();
-        var year66 = (new Date(birthDate.getFullYear() + 66, birthDate.getMonth(), birthDate.getDay())).getFullYear();
-        var year67 = (new Date(birthDate.getFullYear() + 67, birthDate.getMonth(), birthDate.getDay())).getFullYear();
-        var year68 = (new Date(birthDate.getFullYear() + 68, birthDate.getMonth(), birthDate.getDay())).getFullYear();
-        var year69 = (new Date(birthDate.getFullYear() + 69, birthDate.getMonth(), birthDate.getDay())).getFullYear();
-        var year70 = (new Date(birthDate.getFullYear() + 70, birthDate.getMonth(), birthDate.getDay())).getFullYear();
+// Gets a map of estimated benefits by age for the given AIME
+function getEstimatedBenefits(aime)
+{
+    // See https://www.ssa.gov/oact/quickcalc/early_late.html#calculator
+
+    // In the case of early retirement, a benefit is reduced 5/9 of one percent for each month before normal retirement age,
+    // up to 36 months. If the number of months exceeds 36, then the benefit is further reduced 5/12 of one percent per month.
+    // 59 months early = 70.42 percent
+    // 48 months early = 75%
+    // 36 months early = 80%
+    // 24 months early = 86.67%
+    // 12 months early = 93.33%
+    // 12 months late = 108%
+    // 24 months late = 116%
+    // 36 months late = 124%
+    // Delayed retirement is 8.0% extra per year
+
+    bensMap = new Map();
+
+    let total = 0;
+    if ( aime > firstCut)
+    {
+        // Exceeds firstCut, so set total to 90% of first cut.
+        total = 0.9 * firstCut;
+        if ( aime > secondCut )
+        {
+            if ( aime > secondCut )
+            {
+                // Greater than second cut, so set total to 32% of second cut, and 15% of third cut
+                total += (secondCut - firstCut) * .32;
+                total += (aime - secondCut) * .15;
+            }
+            else
+            {
+                // More then first, but less than second.  Substract first from aime and multiply by 32%
+                total += (aime - firstCut) * .32;
+            }
+        }
+    }
+    else
+    {
+        // Less than first cut, so just multiply by 90%
+        total = 0.9 * aime;
     }
 
-    // Get the earnings table in the HTML we want to generate
-    let benifitsTable = document.getElementById("estimatedBenefits");
+    bensMap.set(62, total * .7042);
+    bensMap.set(63, total * .75);
+    bensMap.set(64, total * .80);
+    bensMap.set(65, total * .866667);
+    bensMap.set(66, total * .933333);
+    bensMap.set(67, total);
+    bensMap.set(68, total * 1.08);
+    bensMap.set(69, total * 1.16);
+    bensMap.set(70, total * 1.24);
 
-    // Clear the table contents
-    benifitsTable.innerHTML = "";
+    return bensMap;
+}
 
-    var header = document.createElement("THEAD");
-    benifitsTable.appendChild(header);
+function addRowToBenefitsTable(benifitsTable, age, lastIncome, sortedFica)
+{
+    // Sum the sortedFica array
+    const sum = sortedFica.reduce((partialSum, a) => partialSum + a, 0);
+
+    // Divide by 35 years and 12 months to get the average indexed monthly earnings 
+    let aime = Math.floor( sum / 35 / 12 );
+
+    // Get the benefits for each starting year for receiving benefits
+    let benifits = getEstimatedBenefits(aime);
+
+    // Add row to the table
     var row = document.createElement("TR");
-    header.appendChild(row);
+    benifitsTable.appendChild(row);
 
     // Add the row header
-    createHeader(row, "Year", "The year when benifits started");
-    createHeader(row, "Age Benifits Start", "The age when benifits started");
-    createHeader(row, "Monthly Benifit", "Monthly benefits");
-    createHeader(row, "Yearly equivalent", "Monthly benefits multiplied by 12");
+    var td = document.createElement("TD");
+    var cell = document.createTextNode(birthDate.getFullYear() + age);
+    td.appendChild(cell);
+    row.appendChild(td);
 
-    addRowToBenifitsTable(benifitsTable, year62, 62, age62bens);
-    addRowToBenifitsTable(benifitsTable, year63, 63, age63bens);
-    addRowToBenifitsTable(benifitsTable, year64, 64, age64bens);
-    addRowToBenifitsTable(benifitsTable, year65, 65, age65bens);
-    addRowToBenifitsTable(benifitsTable, year66, 66, age66bens);
-    addRowToBenifitsTable(benifitsTable, year67, 67, age67bens);
-    addRowToBenifitsTable(benifitsTable, year68, 68, age68bens);
-    addRowToBenifitsTable(benifitsTable, year69, 69, age69bens);
-    addRowToBenifitsTable(benifitsTable, year70, 70, age70bens);
+    // Create the age cell
+    td = document.createElement("TD");
+    cell = document.createTextNode(age);
+    td.appendChild(cell);
+    row.appendChild(td);
+
+    const colorScale = new Map([[0,"color0"], [1,"color1"], [2,"color2"], [3,"color3"], [4,"color4"],[5,"color5"], [6,"color6"],]);
+    
+    for (let [claimedAge, value] of benifits)
+    {
+        // Create the benefits cell
+        td = document.createElement("TD");
+        let yearly = Math.floor(value) * monthMultiplier;
+        let footnoteMarker = "";
+        if ( age > claimedAge && age < 67 )
+            footnoteMarker = "*";
+        cell = document.createTextNode(yearly.toLocaleString("en-US", {style:"currency", currency:"USD", maximumFractionDigits:"0"}) + footnoteMarker);
+
+        let yearlyDecile = Math.floor((value * 12) / 10000);
+        td.classList.add(colorScale.get(yearlyDecile));
+        td.appendChild(cell);
+        row.appendChild(td);
+
+
+        if ( yearly < minSS ) minSS = yearly;
+        if ( yearly > maxSS ) maxSS = yearly;
+    }
+
+    document.getElementById("minSS").innerHTML = minSS.toLocaleString("en-US", {style:"currency", currency:"USD", maximumFractionDigits:"0"});
+    document.getElementById("lastYear").innerHTML = earningsHistory.get(lastYear).ficaAdjusted.toLocaleString("en-US", {style:"currency", currency:"USD", maximumFractionDigits:"0"});
+    document.getElementById("maxSS").innerHTML = maxSS.toLocaleString("en-US", {style:"currency", currency:"USD", maximumFractionDigits:"0"});
 
 }
 
+// Add the table that esimtates earnings based on current and future earnings
+function addEstimatedBenefitsTable(sortedFica)
+{
+    // Trim the sortedFica map until it has no more than 35 entries
+    while ( sortedFica.size > 35 )
+    {
+        let lastYear = [...sortedFica][sortedFica.size-1][0];
+        sortedFica.delete(lastYear);
+    }
+    let curYear = new Date().getFullYear();
+    let lastIncome = sortedFica.get(curYear - 1);
+    let top35Incomes = Array.from(sortedFica.values());
+    top35Incomes.sort(function(a, b){return a - b});
+    let curAge = curYear - birthDate.getFullYear();
+
+    // Clear any existing table contents
+    let benifitsTable = document.getElementById("estimatedBenefits");
+    benifitsTable.innerHTML = "";
+
+    let caption = benifitsTable.createCaption();
+    let lastYearSalary =  earningsHistory.get(lastYear).ficaAdjusted.toLocaleString("en-US", {style:"currency", currency:"USD", maximumFractionDigits:"0"});
+    caption.textContent = "Estimated Benifits based on Age Clamied by Last Working Year/Age (Assuming you make " + lastYearSalary + " each year worked after " + lastYear + ")";
+    var tableBody = document.createElement("TBODY");
+    benifitsTable.appendChild(tableBody);
+
+    // Create the column headers
+    var header = document.createElement("THEAD");
+    benifitsTable.appendChild(header);
+
+    var topRow = document.createElement("TR");
+    header.appendChild(topRow);
+
+    var th = document.createElement("TH");
+    cell = document.createTextNode("Last Worked");
+    th.appendChild(cell);
+    th.colSpan = "2";
+    topRow.appendChild(th);
+
+    var secondRow = document.createElement("TR");
+
+    th = document.createElement("TH");
+    cell = document.createTextNode("Year");
+    th.appendChild(cell);
+    secondRow.appendChild(th);
+
+    th = document.createElement("TH");
+    cell = document.createTextNode("Age");
+    th.appendChild(cell);
+    secondRow.appendChild(th);
+
+    th = document.createElement("TH");
+    cell = document.createTextNode("Age Social Security First Claimed");
+    th.colSpan = "9";
+    th.appendChild(cell);
+    topRow.appendChild(th);
+
+    header.appendChild(secondRow);
+
+    // Iterate over every age from 62 to 70
+    for (let claimedAge = 62; claimedAge <= 70; claimedAge++)
+    {
+        th = document.createElement("TH");
+        cell = document.createTextNode(claimedAge);
+        th.appendChild(cell);
+        secondRow.appendChild(th);
+    }
+
+    var row = document.createElement("TR");
+    header.appendChild(row);
+
+    // Iterate until age 70
+    for ( age = curAge; age <= 70; age++)
+    {
+        addRowToBenefitsTable(benifitsTable, age - 1, lastIncome, top35Incomes);
+
+        if ( top35Incomes.length < 25 )
+            top35Incomes.push(lastIncome);
+        else
+        {
+            // Use last year's income as this year's income, if it is larger
+            if ( top35Incomes[0] < lastIncome )
+                top35Incomes[0] = lastIncome;
+        }
+        top35Incomes.sort(function(a, b){return a - b});
+    }
+
+    // Create a footnote for the table
+    var footer = benifitsTable.createTFoot();
+    var footRow = footer.insertRow(0);
+    td = document.createElement("TD");
+    cell = document.createTextNode("* Note benefits may be reduced if you continue to work after claiming Social Security and before full retirement age.");
+    td.colSpan = "11";
+    td.appendChild(cell);
+    footRow.appendChild(td);
+}
   
 function parseXMLFile(xml) {
     parser = new DOMParser();
@@ -168,18 +330,41 @@ function parseXMLFile(xml) {
     let earningsTable = document.getElementById("earningsTable");
     createEarningsTable(earningsTable);
 
-    const medicareMap = new Map();
     const ficaMap = new Map();
+    const adjusteFicaMap = new Map();
+    const medicareMap = new Map();
     const adjustedMedicareMap = new Map();
     let sumMedicare = 0;
     let sumFica = 0;
     let medicareNotFicaCount = 0;
 
+    // Extract the User Information section
+    let userInformation = xmlDoc.getElementsByTagName("osss:UserInformation");
+    let userName = "";
+    if ( userInformation.length === 1 ) {
+        let user = userInformation[0].getElementsByTagName("osss:Name");
+        userName = user[0].childNodes[0].data;
+        if ( userName.length > 0 )
+        {
+            userName = "Earnings History for " + userName;
+        }
+        let bdate = userInformation[0].getElementsByTagName("osss:DateOfBirth");
+        birthDate = new Date(bdate[0].childNodes[0].data);
+
+        // Figure out the year user turns 60.  This is used in the Average Wage Index.
+        lastAWIYear = (new Date(birthDate.getFullYear() + 60, birthDate.getMonth(), birthDate.getDay())).getFullYear();
+        let curYear = new Date().getFullYear();
+        if ( lastAWIYear > curYear - 2 )
+            // Year 60 is after this year.  Use this year instead.
+            lastAWIYear = curYear - 2;
+    }
+
     // Extract the fica and medicare earnings from the Earnings node of the XML
     let lastInflationYear = Array.from(inflationMap.keys()).pop();
     if (earningsRecords.length === 1 ) {
+
         var earnings = earningsRecords[0].getElementsByTagName("osss:Earnings");
-        for ( j = 0; j < earnings.length; j++ ) {
+        for ( let j = 0; j < earnings.length; j++ ) {
             var earning = earnings[j];
 
             // Fetch the year attributes, fica and medicare amounts
@@ -210,35 +395,20 @@ function parseXMLFile(xml) {
             sumMedicare += medicare;
 
             ficaMap.set(endYear, fica);
+            adjusteFicaMap.set(endYear, fica * curInfo.wageIndex);
             medicareMap.set(endYear, medicare);
             adjustedMedicareMap.set(endYear, inflMedicare);
 
         } // For each year of earnings recorded
 
+        // Create a sorted Indexed FICA Earnings map
+        const sortedFica = new Map([...adjusteFicaMap.entries()].sort((a, b) => b[1] - a[1]));
+        let sortedFicaKeys = Array.from( sortedFica.keys( ) );
+        addEstimatedBenefitsTable(sortedFica);
+
         // Create a sorted Medicare Earnings map
         const sortedMedicare = new Map([...adjustedMedicareMap.entries()].sort((a, b) => b[1] - a[1]));
         let sortedKeys = Array.from( sortedMedicare.keys( ) );
-
-        let userInformation = xmlDoc.getElementsByTagName("osss:UserInformation");
-        let birthDate;
-        let userName = "";
-        if ( userInformation.length === 1 ) {
-            let user = userInformation[0].getElementsByTagName("osss:Name");
-            userName = user[0].childNodes[0].data;
-            if ( userName.length > 0 )
-            {
-                userName = "Earnings History for " + userName;
-            }
-            let bdate = userInformation[0].getElementsByTagName("osss:DateOfBirth");
-            birthDate = new Date(bdate[0].childNodes[0].data);
-
-            // Figure out the year user turns 60.  This is used in the Average Wage Index.
-            var year60 = (new Date(birthDate.getFullYear() + 60, birthDate.getMonth(), birthDate.getDay())).getFullYear();
-            let curYear = new Date().getFullYear();
-            if ( year60 > curYear - 2 )
-                // Year 60 is after this year.  Use this year instead.
-                year60 = curYear - 2;
-        }
 
         // Create the table
         let caption = earningsTable.createCaption();
@@ -253,7 +423,7 @@ function parseXMLFile(xml) {
             earningsHistory.get(key).setRank(rank + 1);
             let curMedicare = medicareMap.get(key);
             let percentChange = (curMedicare - lastYearEarnings) / lastYearEarnings;
-            addRowToEarningsTable(tableBody, birthDate, key, year60, percentChange);
+            addRowToEarningsTable(tableBody, birthDate, key, percentChange);
             lastYearEarnings = curMedicare;
         }
 
@@ -284,7 +454,52 @@ function parseXMLFile(xml) {
         });
         tableInitialized = true;
 
-        createEstimatedBeniftsTable(xmlDoc);
+        // Create the estimated earnings output.
+        var tempFica = new Map(sortedFica)
+
+        // Get the top35 years
+        const top35 = sortedKeys.slice(0, 35);
+        var sum = 0;
+
+        // Sum the top 35 adjusted FICA earnings
+        for ( let idx = 0; idx < Math.min(35, earningsHistory.size); idx++)
+        {
+            let year = top35[idx];
+            let curYear = earningsHistory.get(year);
+            sum += curYear.fica * curYear.wageIndex;
+        }
+
+        // AIME is the Average Indexed Monthly Earnings, so divide sum by 25 years and again by 12 months
+        let aime = Math.floor( sum / 35 / 12 );
+        document.getElementById("aime").innerHTML = aime.toLocaleString("en-US", {style:"currency", currency:"USD", maximumFractionDigits:"0"});
+        let total = 0;
+        if ( aime > firstCut)
+        {
+            total = 0.9 * firstCut;
+            document.getElementById("firstCut").innerHTML = (0.9 * firstCut).toLocaleString("en-US", {style:"currency", currency:"USD", maximumFractionDigits:"0"});
+            if ( aime > secondCut )
+            {
+                if ( aime > secondCut )
+                {
+                    total += (secondCut - firstCut) * .32;
+                    document.getElementById("secondCut").innerHTML = ((secondCut - firstCut) * .32).toLocaleString("en-US", {style:"currency", currency:"USD", maximumFractionDigits:"0"});
+                    total += (aime - secondCut) * .15;
+                    document.getElementById("finalCut").innerHTML = ((aime - secondCut) * .15).toLocaleString("en-US", {style:"currency", currency:"USD", maximumFractionDigits:"0"});
+                }
+                else
+                {
+                    document.getElementById("secondCut").innerHTML = ((aime - firstCut) * .32).toLocaleString("en-US", {style:"currency", currency:"USD", maximumFractionDigits:"0"});
+                    total += (aime - firstCut) * .32;
+                }
+            }
+        }
+        else
+        {
+            total = 0.9 * aime;
+            document.getElementById("firstCut").innerHTML = (aime * 0.9).toLocaleString("en-US", {style:"currency", currency:"USD", maximumFractionDigits:"0"});
+        }
+
+        document.getElementById("pia").innerHTML = total.toLocaleString("en-US", {style:"currency", currency:"USD", maximumFractionDigits:"0"});
 
         $( "#tabs" ).tabs( "enable", "#Summary" );
         $( "#tabs" ).tabs( "enable", "#TaxesPaid" );
@@ -312,7 +527,8 @@ var openXMLFile = function(event) {
 
 };
 
-function addRowToEarningsTable(earningsTable, bdate, year, year60, medicarePercent) {
+
+function addRowToEarningsTable(earningsTable, bdate, year, medicarePercent) {
     var row = document.createElement("TR");
     earningsTable.appendChild(row);
 
@@ -346,19 +562,23 @@ function addRowToEarningsTable(earningsTable, bdate, year, year60, medicarePerce
     
     // Create the index cell
     td = document.createElement("TD");
+    // The wage index is 1 from age 60 and later
     let wageIndex = 1;
+    let curAverageWage = averageWage.get(year);
+    // If the year is less than two years ago, we can calculate the wage index
     if ( year <= new Date().getFullYear() - 2 )
     {
-        let curAverageWage = averageWage.get(year);
-        let finalAverageWage = averageWage.get(year60);
+        let finalAverageWage = averageWage.get(lastAWIYear);
         wageIndex = finalAverageWage / curAverageWage;
     }
-    cell = document.createTextNode(formatter7.format(wageIndex));
+    curYear.wageIndex = wageIndex;
+    cell = document.createTextNode(formatter7.format(curYear.wageIndex));
     td.appendChild(cell);
     row.appendChild(td);
 
     // Create the fica cell
     let fica = curYear.fica;
+    let medicare = curYear.medicare;
     td = document.createElement("TD");
     let dollars = fica.toLocaleString("en-US", {style:"currency", currency:"USD", maximumFractionDigits:"0"});
     cell = document.createTextNode(dollars);
@@ -368,6 +588,20 @@ function addRowToEarningsTable(earningsTable, bdate, year, year60, medicarePerce
     // Create the average wage index adjusted fica cell
     td = document.createElement("TD");
     dollars = (fica * wageIndex).toLocaleString("en-US", {style:"currency", currency:"USD"});
+    cell = document.createTextNode(dollars);
+    td.appendChild(cell);
+    row.appendChild(td);
+
+    // Create the average wage  cell
+    td = document.createElement("TD");
+    dollars = curAverageWage.toLocaleString("en-US", {style:"currency", currency:"USD"});
+    cell = document.createTextNode(dollars);
+    td.appendChild(cell);
+    row.appendChild(td);
+
+    // Create the % of average wage  cell
+    td = document.createElement("TD");
+    dollars = (medicare/curAverageWage).toLocaleString("en-US", {style:"percent"});
     cell = document.createTextNode(dollars);
     td.appendChild(cell);
     row.appendChild(td);
@@ -382,11 +616,11 @@ function addRowToEarningsTable(earningsTable, bdate, year, year60, medicarePerce
 
     // Create the percent of max taxed cell
     td = document.createElement("TD");
-    if ( isNaN(fica) || ! isFinite(fica) ) {
+    if ( isNaN(medicare) || ! isFinite(medicare) ) {
         cell = document.createTextNode("");
     }
     else {
-        let pct = (fica / curMaxTaxedIncome).toLocaleString("en-US", {style:"percent"});
+        let pct = (medicare / curMaxTaxedIncome).toLocaleString("en-US", {style:"percent"});
         cell = document.createTextNode(pct);
     }
     td.appendChild(cell);
@@ -394,7 +628,6 @@ function addRowToEarningsTable(earningsTable, bdate, year, year60, medicarePerce
 
     // Create the medicare cell
     td = document.createElement("TD");
-    let medicare = curYear.medicare;
     dollars = medicare.toLocaleString("en-US", {style:"currency", currency:"USD", maximumFractionDigits:"0"});
     cell = document.createTextNode(dollars);
     if ( medicare === fica )
@@ -469,6 +702,18 @@ function addZeroToEarningsTable(earningsTable, rank) {
     td.appendChild(cell);
     row.appendChild(td);
 
+    // Create the average wage cell
+    td = document.createElement("TD");
+    cell = document.createTextNode("$0");
+    td.appendChild(cell);
+    row.appendChild(td);
+
+    // Create the % of average wage cell
+    td = document.createElement("TD");
+    cell = document.createTextNode("0%");
+    td.appendChild(cell);
+    row.appendChild(td);
+
     // Create the max taxed cell
     td = document.createElement("TD");
     cell = document.createTextNode("$0");
@@ -502,37 +747,6 @@ function addZeroToEarningsTable(earningsTable, rank) {
     row.appendChild(td);
 }
 
-function addRowToBenifitsTable(benifitsTable, year, age, monthly) {
-    var row = document.createElement("TR");
-    benifitsTable.appendChild(row);
-
-    // Add the row header
-    var td = document.createElement("TD");
-    var cell = document.createTextNode(year);
-    td.appendChild(cell);
-    row.appendChild(td);
-
-    // Create the age cell
-    td = document.createElement("TD");
-    cell = document.createTextNode(age);
-    td.appendChild(cell);
-    row.appendChild(td);
-
-    // Create the monthly cell
-    td = document.createElement("TD");
-    cell = document.createTextNode(monthly.toLocaleString("en-US", {style:"currency", currency:"USD", maximumFractionDigits:"0"}));
-    td.appendChild(cell);
-    row.appendChild(td);
-
-    // Create the yearly cell
-    td = document.createElement("TD");
-    cell = document.createTextNode((monthly * 12).toLocaleString("en-US", {style:"currency", currency:"USD", maximumFractionDigits:"0"}));
-    td.appendChild(cell);
-    row.appendChild(td);
-    
-}
-
-
 function createHeader(row, header, tooltip)
 {
     let th = document.createElement("TH");
@@ -554,15 +768,6 @@ function createHeader(row, header, tooltip)
 
 }
 
-function createDollarCell(row, dollarValue)
-{
-    var td = document.createElement("TD");
-    var dollars = dollarValue.toLocaleString("en-US", {style:"currency", currency:"USD"});
-    var cell = document.createTextNode(dollars);
-    td.appendChild(cell);
-    row.appendChild(td);
-}
-
 function createEarningsTable(earningsTable) {
 
     // Clear the table contents
@@ -577,22 +782,16 @@ function createEarningsTable(earningsTable) {
     createHeader(row, "Year", "Start Year");
     createHeader(row, "Age", "Age as of 1-January of the year shown.");
     createHeader(row, "Rank", "The rank of Adjusted Medicare Earnings, where 1 is the highest.");
-    createHeader(row, "Average Wage Index (AWI)", "The Average Wage Index (AWI) from https://www.ssa.gov/oact/cola/awifactors.html.");
+    createHeader(row, "Average Wage Index (AWI)", "The Average Wage Index (AWI) derived from https://www.ssa.gov/oact/cola/AWI.html.");
     createHeader(row, "Fica Earnings", "Your Social Security taxed earnings.");
     createHeader(row, "AWI adjusted Fica Earnings", "Your Social Security taxed earnings, indexed by the AWI.  This is the value Social Security uses to calculate your benifit amount.");
-    createHeader(row, "Taxable Maximum", "The maximum taxable income for the year.");
-    createHeader(row, "% of Taxable Maximum", "The percent of maximum taxable for the year.");
-    createHeader(row, "Medicare Earnings", "Your Medicare taxed earings.");
-    createHeader(row, "Inflation adjusted Medicare Earnings", "Your Medicare taxed earings, indexed by the consumer price.");
+    createHeader(row, "Average Wage", "The US Average Wage for the given year, from https://www.ssa.gov/oact/cola/AWI.html.");
+    createHeader(row, "% of Average Wage", "The percent of US Average Wage for the given year.");
+    createHeader(row, "Taxable Maximum", "The social security maximum taxable income for the year.");
+    createHeader(row, "% of Taxable Maximum", "The percent of the social security maximum taxable for the year.");
+    createHeader(row, "Medicare Earnings", "Your Medicare taxed earings (includes pre-tax 401K earnings, etc).");
+    createHeader(row, "Inflation adjusted Medicare Earnings", "Your Medicare taxed earings, indexed by the consumer price index.");
     createHeader(row, "% Change", "The percent change in your Inflation adjusted Medicare taxed earnings from the prior year that you had earnings (i.e. your inflation adjusted raise).");
-}
-
-function createParagraph(div, text)
-{
-    let pText = document.createTextNode(text);
-    var paragaph = document.createElement("p");
-    paragaph.appendChild(pText);
-    div.appendChild(paragaph);
 }
 
 function timeUntil(futureDate) {
@@ -607,14 +806,6 @@ function timeUntil(futureDate) {
 function setSummaryValue(docId, value)
 {
     document.getElementById(docId).innerHTML = value.toLocaleString("en-US", {style:"currency", currency:"USD", maximumFractionDigits:"0"});
-
-}
-
-function getEstimatedBenefit(xmlDoc, key)
-{
-    let estimatedBenefits = xmlDoc.getElementsByTagName("osss:EstimatedBenefits");
-    let estimate = estimatedBenefits[0].getElementsByTagName(key)[0].getElementsByTagName("osss:Estimate")[0].childNodes[0].data;
-    return Number(estimate);
 }
 
 function createStatisticsOutput(statisticsDiv, xmlDoc, fica, sortedMedicareAdjusted, medicareMap) {
@@ -650,12 +841,14 @@ function createStatisticsOutput(statisticsDiv, xmlDoc, fica, sortedMedicareAdjus
         }
         sumMedicare += value;
     }
+    document.getElementById("totalIncome").innerHTML = sumMedicare.toLocaleString("en-US", {style:"currency", currency:"USD", maximumFractionDigits:"0"});
 
     let sumAdjustedMedicare = 0;
     for (let [key, value] of sortedMedicareAdjusted)
     {
         sumAdjustedMedicare += value;
     }
+    document.getElementById("totalIncomeAdjusted").innerHTML = sumAdjustedMedicare.toLocaleString("en-US", {style:"currency", currency:"USD"});
     
 
     if ( exceededCount > 0 )
@@ -712,9 +905,6 @@ function createStatisticsOutput(statisticsDiv, xmlDoc, fica, sortedMedicareAdjus
     {
         document.getElementById("highestInflation").style.display = "none";
     }
-
-    document.getElementById("totalIncome").innerHTML = sumMedicare.toLocaleString("en-US", {style:"currency", currency:"USD", maximumFractionDigits:"0"});
-    document.getElementById("totalIncomeAdjusted").innerHTML = sumAdjustedMedicare.toLocaleString("en-US", {style:"currency", currency:"USD"});
 
     // Get the user information portion of the XML document
     let userInformation = xmlDoc.getElementsByTagName("osss:UserInformation");

@@ -27,15 +27,15 @@
 </head>
 
 <body onload="init()">
-		<div id="tabs">
+	<div id="tabs">
 		<ul>
-		  <li><a href="#Overview">Overview</a></li>
-		  <li><a href="#Summary">Summary</a></li>
-		  <li><a href="#TaxesPaid">Taxes Paid</a></li>
-		  <li><a href="#Earnings">Earnings History</a></li>
-		  <li><a href="#Benefits">Estimated Benefits</a></li>
+			<li><a href="#Overview">Overview</a></li>
+			<li><a href="#Summary">Summary</a></li>
+			<li><a href="#TaxesPaid">Taxes Paid</a></li>
+			<li><a href="#Earnings">Earnings History</a></li>
+			<li><a href="#Benefits">Estimated Benefits</a></li>
 		</ul>
-		<div id="Overview">
+	<div id="Overview">
 			<h2>Overview</h2>
 			<!-- <div>
 				<p>Welcome to SocialSecuTrack.com, the leading online platform that empowers users to effortlessly analyze their personal social security payment history and gain valuable insights into future payout projections. Our user-friendly interface and advanced algorithms enable you to securely access and evaluate your social security records, ensuring accurate and comprehensive information at your fingertips. With SocialSecuTrack.com, you can confidently plan for the future, make informed financial decisions, and optimize your retirement strategy based on real-time data. Start exploring your social security payment history today and secure a prosperous future with ease.</p>
@@ -94,6 +94,8 @@
 				<p>In total, you earned <span class="number" id="totalIncome"></span> (<span class="number" id="totalIncomeAdjusted"></span> inflation adjusted).</p>
 				<p>You are eligible to collect Social Security at age <span class="number">62</span> on <span class="number" id="eligible62Date"></span><span class="number" id="eligible62Diff"></span>.</p>
 				<p>The maximum possible Social Security payments is at age <span class="number">70</span> on <span class="number" id="eligible70Date"></span><span class="number" id="eligible70Diff"></span>.</p>
+				<p>If you stopped working last year, and claimed Social Security at age 62, your approximate yearly benefits would be <span class="number" id="minSS"></span><span class="number" id="eligible70Diff"></span>.</p>
+				<p>If you continue working until age 70, earning the same every year as you did last year (<span class="number" id="lastYear"></span>), and claimed Social Security at age 70, your approximate yearly benefits would be <span class="number" id="maxSS"></span><span class="number" id="eligible70Diff"></span>.</p>
 			</div>
 		</div>
 		
@@ -120,10 +122,20 @@
 
 		<div class="tableDiv" id="Benefits">
 			<h2>Estimated Benefits</h2>
+			<p>The Average Indexed Monthly Earnings (<span style="font-weight:bold;">AIME</span>) is the average of all months in your 35 highest Average Wage Index adjusted earnings.
+				Your current AIME is: <span class="number" id="aime"></span>.</p>
+			<p>The Primary Insurance Amount (<span style="font-weight: bold;">PIA</span>) for those reaching full retirement age in 2023 is:</p>
+			<ul>
+				<li>90 percent of the first $1,115 of his/her average indexed monthly earnings (<span id="firstCut" class="number"></span>), plus</li>
+				<li>32 percent of his/her average indexed monthly earnings over $1,115 and through $6,721 (<span id="secondCut" class="number"></span>), plus</li>
+				<li>15 percent of his/her average indexed monthly earnings over $6,721 (<span id="finalCut" class="number"></span>).</li>
+			</ul>
+			<p>For a PIA total of <span id="pia" class="number"></span>.  If you stopped contributing to Social Security last year, your monthly check if claimed at your full retirement age would be this amoount.</p>
+			<p>Note, the following table assumes your full retirement age is 67.  If you were born before 1960 you will need to adjust the start date/age accordingly.</p>
 			<table id="estimatedBenefits" class="hover">
 			</table>
 		</div>
-</div>
+	</div>
 </body>
 
 </html>
