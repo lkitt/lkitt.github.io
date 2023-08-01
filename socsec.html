@@ -8,13 +8,21 @@
 	<!-- CSS -->
 	<link rel="stylesheet" href="socsec.css">
 	<link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.css" />
+	<link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.1/css/buttons.dataTables.min.css" />
 	<link rel="stylesheet" href="Resources/jquery-ui.min.css">
 
 	<!--JavaScript-->
-	<script src="socsec.js"></script>
-	<script src="jquery-3.7.0.min.js"></script>
+	<script type="text/javascript" language="javascript" src="socsec.js"></script>
+	<script type="text/javascript" language="javascript" src="jquery-3.7.0.min.js"></script>
 	<script src="https://code.jquery.com/ui/1.13.1/jquery-ui.min.js" integrity="sha256-eTyxS0rkjpLEo16uXTS0uVCS4815lc40K2iVpWDvdSY=" crossorigin="anonymous"></script>
 	<script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.js"></script>
+	<script type="text/javascript" language="javascript" src="https://cdn.datatables.net/buttons/2.4.1/js/dataTables.buttons.min.js"></script>
+	<script type="text/javascript" language="javascript" src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/pdfmake.min.js"></script>
+	<script type="text/javascript" language="javascript" src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/vfs_fonts.js"></script>
+	<script type="text/javascript" language="javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+	<script type="text/javascript" language="javascript" src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.html5.min.js"></script>
+	<script type="text/javascript" language="javascript" src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.print.min.js"></script>
+	<script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
 
 	<script>
 		$( function() {
@@ -89,7 +97,7 @@
 				<p id="exceeded">Your earnings met or exceeded the maximum taxable earnings <span class="number" id="exceededCount"></span> times.</p>
 				<p>Your highest earning year was <span id="highestYear" class="number"></span> when you earned <span id="highestedIncome" class="number"></span>.</p>
 				<p id="highestInflation">Inflation adjusted, your highest earning year was <span class="number" id="highestYearAdjusted"></span> when you earned <span id="highestedIncomeAdjusted" class="number"></span>.</p>
-				<p id="minInfo">Your lowest earning year of the top 35 was <span class="number" id="lowestYear"></span> where you earned <span class="number" id="lowestIncome"></span> (inflation adjusted).</p>
+				<p id="minInfo">Your lowest earning year of the top 35 was <span class="number" id="lowestYear"></span> where you earned <span class="number" id="lowestIncome"></span> (Average Wage Index adjusted).  You must earn more than this in this year or a future year to increase your Social Security Benifits.</p>
 				<br />
 				<p>In total, you earned <span class="number" id="totalIncome"></span> (<span class="number" id="totalIncomeAdjusted"></span> inflation adjusted).</p>
 				<p>You are eligible to collect Social Security at age <span class="number">62</span> on <span class="number" id="eligible62Date"></span><span class="number" id="eligible62Diff"></span>.</p>
@@ -102,7 +110,6 @@
 		<div id="TaxesPaid" class="tableDiv">
 			<h2>Social Security Taxes Paid</h2>
 			<table id="taxTable" class="taxTable hover">
-				<caption>Taxes Paid</caption>
 				<thead>
 					<tr><th></th><th>Fica Tax Paid</th><th>Medicare Tax Paid</th><th>Total</th></tr>
 				</thead>
@@ -112,25 +119,39 @@
 					<tr><th>Total</th><td id="fixaTotal"></td><td id="medicareTotal"></td><td id="grandTotal"></td></tr>
 				</tbody>
 			</table>
+			<div id="taxesPaidChart">
+
+			</div>
 		</div>
 
 		<div class="tableDiv" id="Earnings">
 			<h2>Earnings History</h2>
-			<table id="earningsTable" class="hover">
+			<fieldset id="earningsOptions">
+				<input type="checkbox" class="checkbox" name="showMedicare" id="showMedicare">
+				<label for="showMedicare">Show Medicare Earnings</label>
+				<input type="checkbox" class="checkbox" name="showAverageWage" id="showAverageWage">
+				<label for="showAverageWage">Show Average Wage Information</label>
+				<input type="checkbox" class="checkbox" name="showTaxMax" id="showTaxMax">
+				<label for="showTaxMax">Show Taxible Maximum Information</label>
+			  </fieldset>
+
+			<table id="earningsTable" class="hover" style="width:80%">
 			</table>
+			<div id="earningsChart">
+			</div>
 		</div>
 
 		<div class="tableDiv" id="Benefits">
 			<h2>Estimated Benefits</h2>
 			<p>The Average Indexed Monthly Earnings (<span style="font-weight:bold;">AIME</span>) is the average of all months in your 35 highest Average Wage Index adjusted earnings.
-				Your current AIME is: <span class="number" id="aime"></span>.</p>
+				Your current AIME is: <span class="number" id="aime"></span> or <span class="number" id="aimey"></span> yearly.</p>
 			<p>The Primary Insurance Amount (<span style="font-weight: bold;">PIA</span>) for those reaching full retirement age in 2023 is:</p>
 			<ul>
-				<li>90 percent of the first $1,115 of his/her average indexed monthly earnings (<span id="firstCut" class="number"></span>), plus</li>
-				<li>32 percent of his/her average indexed monthly earnings over $1,115 and through $6,721 (<span id="secondCut" class="number"></span>), plus</li>
-				<li>15 percent of his/her average indexed monthly earnings over $6,721 (<span id="finalCut" class="number"></span>).</li>
+				<li>90 percent of the first $1,115 of his/her AIME (<span id="firstCut" class="number"></span>), plus</li>
+				<li>32 percent of his/her AIME over $1,115 and through $6,721 (<span id="secondCut" class="number"></span>), plus</li>
+				<li>15 percent of his/her AIME over $6,721 (<span id="finalCut" class="number"></span>).</li>
 			</ul>
-			<p>For a PIA total of <span id="pia" class="number"></span>.  If you stopped contributing to Social Security last year, your monthly check if claimed at your full retirement age would be this amoount.</p>
+			<p>For a PIA total of <span id="pia" class="number"></span> per month (<span id="piay" class=number></span> yearly).  If you stopped contributing to Social Security last year, your approximate monthly check if claimed at your full retirement age (67) would be this amount.</p>
 			<p>Note, the following table assumes your full retirement age is 67.  If you were born before 1960 you will need to adjust the start date/age accordingly.</p>
 			<table id="estimatedBenefits" class="hover">
 			</table>
