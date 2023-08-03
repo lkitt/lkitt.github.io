@@ -45,9 +45,15 @@
 		</ul>
 	<div id="Overview">
 			<h2>Overview</h2>
-			<!-- <div>
-				<p>Welcome to SocialSecuTrack.com, the leading online platform that empowers users to effortlessly analyze their personal social security payment history and gain valuable insights into future payout projections. Our user-friendly interface and advanced algorithms enable you to securely access and evaluate your social security records, ensuring accurate and comprehensive information at your fingertips. With SocialSecuTrack.com, you can confidently plan for the future, make informed financial decisions, and optimize your retirement strategy based on real-time data. Start exploring your social security payment history today and secure a prosperous future with ease.</p>
-			</div> -->
+			<div>
+				<p>Analyze your personal social security payment history, downloaded from your personal <a href="https://www.ssa.gov/">ssa.gov</a> account.  Receive insights into:</p>
+				<ul>
+					<li>The amount of taxes you and your employer have paid.</li>
+					<li>Your earnings history.</li>
+					<li>Your estimated benefits.</li>
+				</ul>
+				<p>See the Instructions below for information on how to use this tool.</p>
+			</div>
 			
 			<p class="buttonLabel">Select a Social Security XML file</p>
 			<input type="file" id="xmlFileInput" accept='.xml' onchange='openXMLFile(event)' class="button"/>
@@ -60,7 +66,7 @@
 				<p class="instructions">Click on the "Download Statement Data as XML" link and save it somewhere on your device.</p>
 				<p  class="example"><img src="xml.png" alt="Download Statement Data as an XML file example"></p>
 				<p class="instructions">Log out of the ssa.gov site (if you wish).</p>
-				<p class="instructions">Below, click on the "Choose File" button below and browse to the XML file you downloaded above.</p>
+				<p class="instructions">Above, click on the "Choose File" button and browse to the XML file you downloaded.</p>
 			</div>
 
 			<button class="accordion">Disclaimer</button>
@@ -81,10 +87,8 @@
 			<div class="panel">
 				<p>
 					We do not store any user data on our servers.
-					We believe in safeguarding your personal information and respecting your right to privacy.
 					When you browse our website, no personally identifiable information is collected, tracked, or retained by us.
 					We adhere to stringent data protection practices and do not engage in any data storage activities that could compromise your privacy.
-					Your trust is of utmost importance to us, and we are committed to maintaining a safe and secure online environment.
 				</p>
 			</div>
 			
@@ -103,7 +107,7 @@
 				<p>You are eligible to collect Social Security at age <span class="number">62</span> on <span class="number" id="eligible62Date"></span><span class="number" id="eligible62Diff"></span>.</p>
 				<p>The maximum possible Social Security payments is at age <span class="number">70</span> on <span class="number" id="eligible70Date"></span><span class="number" id="eligible70Diff"></span>.</p>
 				<p>If you stopped working last year, and claimed Social Security at age 62, your approximate yearly benefits would be <span class="number" id="minSS"></span><span class="number" id="eligible70Diff"></span>.</p>
-				<p>If you continue working until age 70, earning the same every year as you did last year (<span class="number" id="lastYear"></span>), and claimed Social Security at age 70, your approximate yearly benefits would be <span class="number" id="maxSS"></span><span class="number" id="eligible70Diff"></span>.</p>
+				<p>If you continue working until age 70, earning the same every year as you did the last year you had recorded FICA earnings (<span class="number" id="lastYear"></span>), and claimed Social Security at age 70, your approximate yearly benefits would be <span class="number" id="maxSS"></span><span class="number" id="eligible70Diff"></span>.</p>
 			</div>
 		</div>
 		
