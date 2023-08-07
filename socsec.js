@@ -203,6 +203,7 @@ function addRowToBenefitsTable(benefitsTable, age, lastIncome, sortedFica)
     // Add the row header
     var td = document.createElement("TH");
     let year = birthDate.getFullYear() + age;
+    row.setAttribute("year", year);
     var cell = document.createTextNode(year);
     td.appendChild(cell);
     row.appendChild(td);
@@ -241,6 +242,7 @@ function addRowToBenefitsTable(benefitsTable, age, lastIncome, sortedFica)
         // Create the benefits cell
         td = document.createElement("TD");
         let yearly = Math.floor(value) * monthMultiplier;
+        td.setAttribute("benefit", yearly);
         let footnoteMarker = "";
         if ( age >= claimedAge && age < 67 )
             footnoteMarker = "*";
@@ -385,7 +387,7 @@ function addEstimatedBenefitsTable(sortedFica)
     var footRow = footer.insertRow(0);
     td = document.createElement("TD");
     cell = document.createTextNode("* Note benefits may be reduced if you continue to work after claiming Social Security and before full retirement age.");
-    td.colSpan = "11";
+    td.colSpan = "12";
     td.appendChild(cell);
     footRow.appendChild(td);
 
@@ -405,7 +407,93 @@ function addEstimatedBenefitsTable(sortedFica)
     });
 
     benefitsTableInitialized = true;
-    
+
+    var rows = document.querySelectorAll("#estimatedBenefits tr");
+
+    for (var row of rows) {
+        row.addEventListener('click', marker)
+    }
+
+    function drawCumulativeLineChart(benAmounts, year)
+    {
+        google.charts.load('current', {'packages':['line']});
+        google.charts.setOnLoadCallback(drawLineChart);
+
+        function drawLineChart()
+        {
+            var data = new google.visualization.DataTable();
+            data.addColumn('number', 'Age');
+            data.addColumn('number', '62');
+            data.addColumn('number', '63');
+            data.addColumn('number', '64');
+            data.addColumn('number', '65');
+            data.addColumn('number', '66');
+            data.addColumn('number', '67');
+            data.addColumn('number', '68');
+            data.addColumn('number', '69');
+            data.addColumn('number', '70');
+
+            let firstYear = birthDate.getFullYear() + 62;
+            let lastYear = birthDate.getFullYear() + 100;
+            for ( let curYear = firstYear; curYear <= lastYear; curYear++ )
+            {
+                let multiplier = curYear - firstYear + 1;
+                let curData = [];
+                curData.push(curYear - birthDate.getFullYear() + 1);
+                for ( let claimOffset = 0; claimOffset < 9; ++claimOffset )
+                {
+                    let cum = benAmounts[claimOffset] * (multiplier - claimOffset);
+                    if ( claimOffset > curYear - firstYear)
+                        cum = null;
+                    curData.push(cum);
+                }
+                data.addRow(curData);
+            }
+
+            
+            var chartwidth = $('#Benefits').width() - 100;
+            var chartheight = chartwidth / 3;
+            var title = 'Cumulative Benefits if Last Year Worked is ';
+            title += String(year) + " (age " + String(year - birthDate.getFullYear()) + ")";
+            var options = {
+                title: title,
+                hAxis: {
+                    title: 'Age',
+                    minValue: 0,
+                    format: "####"
+                },
+                vAxis: {
+                    title: 'Cumulative Benefits',
+                    minValue: 0,
+                    format: "$#,###"
+                },
+                width: chartwidth,
+                height: chartheight,
+            }
+
+            var chart = new google.charts.Line(document.getElementById('bensChart'));
+            chart.draw(data, google.charts.Line.convertOptions(options));
+        }
+    }
+
+    function marker() {
+        // TODO: Add handler to highlight row, draw chart.
+        let yearStr = this.getAttribute("year");
+        if ( yearStr !== null )
+        {
+            let year = Number(this.getAttribute("year"));
+            let children = this.getElementsByTagName("TD");
+            let benAmounts = [];
+            for(let idx = 0; idx < children.length; idx++)
+            {
+                let child = children[idx];
+                let yearlyBenefit = Number(child.getAttribute("benefit"));
+                benAmounts.push(yearlyBenefit);
+            }
+
+            drawCumulativeLineChart(benAmounts, year);
+        }
+    }
 }
   
 function parseXMLFile(xml) {
@@ -557,6 +645,39 @@ function parseXMLFile(xml) {
         $( "#tabs" ).tabs( "enable", "#Summary" );
         $( "#tabs" ).tabs( "enable", "#TaxesPaid" );
         $( "#tabs" ).tabs( "enable", "#Earnings" );
+        $( "#tabs" ).tabs({
+            activate: function(event ,ui)
+            {
+                if ( ui.newTab[0].innerText == "Earnings History" )
+                {
+                    drawIncomeHistoryChart();
+                }
+                else if ( ui.newTab[0].innerText == "Taxes Paid" )
+                {
+                    // Get the earnings Record in the XML document
+                    let earningsRecords = xmlDoc.getElementsByTagName("osss:EarningsRecord");
+                    let ficaTaxTotalEmployer = Number(earningsRecords[0].getElementsByTagName("osss:FicaTaxTotalEmployer")[0].childNodes[0].data);
+                    let ficaTaxTotalIndividual = Number(earningsRecords[0].getElementsByTagName("osss:FicaTaxTotalIndividual")[0].childNodes[0].data);
+                    let medicareTaxTotalEmployer = Number(earningsRecords[0].getElementsByTagName("osss:MedicareTaxTotalEmployer")[0].childNodes[0].data);
+                    let medicareTaxTotalIndividual = Number(earningsRecords[0].getElementsByTagName("osss:MedicareTaxTotalIndividual")[0].childNodes[0].data);
+                    document.getElementById("taxTable").style.visibility = "visible";
+
+                    // Set the summary values
+                    setSummaryValue("fixaemployee", ficaTaxTotalIndividual);
+                    setSummaryValue("medicareemployee", medicareTaxTotalIndividual);
+                    setSummaryValue("employeeTotal", ficaTaxTotalIndividual + medicareTaxTotalIndividual);
+                    setSummaryValue("ficaEmployer", ficaTaxTotalEmployer);
+                    setSummaryValue("medicareEmployer",medicareTaxTotalEmployer );
+                    setSummaryValue("employerTotal", ficaTaxTotalEmployer + medicareTaxTotalEmployer);
+                    setSummaryValue("fixaTotal", ficaTaxTotalIndividual + ficaTaxTotalEmployer);
+                    setSummaryValue("medicareTotal", medicareTaxTotalIndividual + medicareTaxTotalEmployer);
+                    setSummaryValue("grandTotal", ficaTaxTotalIndividual + medicareTaxTotalIndividual + ficaTaxTotalEmployer + medicareTaxTotalEmployer);
+
+
+                    drawTaxesPaidChart(ficaTaxTotalEmployer,ficaTaxTotalIndividual,medicareTaxTotalEmployer,medicareTaxTotalIndividual);
+                }
+            }
+        });
         $( "#tabs" ).tabs( "enable", "#Benefits" );
         $( "#tabs" ).tabs( "option", "active", 1 );
     }
@@ -643,6 +764,7 @@ function addRowToEarningsTable(earningsTable, bdate, year, medicarePercent) {
 
     // Create the average wage index adjusted fica cell
     td = document.createElement("TD");
+    td.classList.add("AWI");
     dollars = (fica * wageIndex).toLocaleString("en-US", {style:"currency", currency:"USD"});
     cell = document.createTextNode(dollars);
     td.appendChild(cell);
@@ -696,10 +818,6 @@ function addRowToEarningsTable(earningsTable, bdate, year, medicarePercent) {
         td = document.createElement("TD");
         dollars = medicare.toLocaleString("en-US", {style:"currency", currency:"USD", maximumFractionDigits:"0"});
         cell = document.createTextNode(dollars);
-        if ( medicare === fica )
-        {
-            td.classList.add("same");
-        }
         td.appendChild(cell);
         row.appendChild(td);
 
@@ -730,6 +848,7 @@ function addRowToEarningsTable(earningsTable, bdate, year, medicarePercent) {
 
 function addZeroToEarningsTable(earningsTable, rank) {
     var row = document.createElement("TR");
+    row.classList.add("top35");
     earningsTable.appendChild(row);
 
     // Add the row header
@@ -751,7 +870,6 @@ function addZeroToEarningsTable(earningsTable, rank) {
         td = document.createElement("TD");
         cell = document.createTextNode(rank);
         td.appendChild(cell);
-        row.classList.add("top35");
         row.appendChild(td);
     }
     
@@ -769,6 +887,7 @@ function addZeroToEarningsTable(earningsTable, rank) {
 
     // Create the average wage index adjusted fica cell
     td = document.createElement("TD");
+    td.classList.add("AWI");
     cell = document.createTextNode("$0");
     td.appendChild(cell);
     row.appendChild(td);
@@ -993,18 +1112,61 @@ function drawTaxesPaidChart(ficaTaxTotalEmployer,ficaTaxTotalIndividual,medicare
         var view = new google.visualization.DataView(data);
 
         var options = {
-            chartArea: {width: '60%'},
             isStacked: true,
             width: 600,
             height: 400,
             hAxis: {
                 title: 'Taxes',
                 minValue: 0,
-            }
+                format: "$#,###"
+            },
         };
 
         var chart = new google.visualization.BarChart(document.getElementById("taxesPaidChart"));
         chart.draw(view, options);
+    }
+}
+
+function drawIncomeHistoryChart()
+{
+    google.charts.load('current', {'packages':['line']});
+    google.charts.setOnLoadCallback(drawLineChart);
+    
+    function drawLineChart()
+    {
+        var data = new google.visualization.DataTable();
+        data.addColumn('number', 'Year');
+        data.addColumn('number', 'Medicare Income');
+        data.addColumn('number', 'Inflation Adjusted Medicare Income');
+        data.addColumn('number', 'Fica');
+        data.addColumn('number', 'Adjusted Fica');
+        data.addColumn('number', 'US Average Wage');
+        data.addColumn('number', 'Taxable Maximum');
+
+        for (let [key, value] of earningsHistory) {
+            let curInfo = earningsHistory.get(key);
+            data.addRow([value.year, value.medicare, value.adjMed, value.fica, value.ficaAdjusted, averageWage.get(key), maxTaxedIncome.get(key)]);
+        }
+        
+        var chartwidth = $('#Earnings').width() - 100;
+        var chartheight = chartwidth / 3;
+        var options = {
+            hAxis: {
+                title: 'Year',
+                minValue: 0,
+                format: "####"
+            },
+            vAxis: {
+                title: 'Income',
+                minValue: 0,
+                format: "$#,###"
+            },
+            width: chartwidth,
+            height: chartheight,
+        }
+
+        var chart = new google.charts.Line(document.getElementById('earningsChart'));
+        chart.draw(data, google.charts.Line.convertOptions(options));
     }
 }
 
@@ -1139,28 +1301,5 @@ function createStatisticsOutput(statisticsDiv, xmlDoc, fica, sortedMedicareAdjus
     togo = timeUntil(lastEligibleDate, today);
     document.getElementById("eligible70Date").innerHTML = lastEligibleDate.toLocaleDateString(undefined, options);
     document.getElementById("eligible70Diff").innerHTML = togo;
-
-
-    // Get the earnings Record in the XML document
-    let earningsRecords = xmlDoc.getElementsByTagName("osss:EarningsRecord");
-    let ficaTaxTotalEmployer = Number(earningsRecords[0].getElementsByTagName("osss:FicaTaxTotalEmployer")[0].childNodes[0].data);
-    let ficaTaxTotalIndividual = Number(earningsRecords[0].getElementsByTagName("osss:FicaTaxTotalIndividual")[0].childNodes[0].data);
-    let medicareTaxTotalEmployer = Number(earningsRecords[0].getElementsByTagName("osss:MedicareTaxTotalEmployer")[0].childNodes[0].data);
-    let medicareTaxTotalIndividual = Number(earningsRecords[0].getElementsByTagName("osss:MedicareTaxTotalIndividual")[0].childNodes[0].data);
-    document.getElementById("taxTable").style.visibility = "visible";
-
-    drawTaxesPaidChart(ficaTaxTotalEmployer,ficaTaxTotalIndividual,medicareTaxTotalEmployer,medicareTaxTotalIndividual);
-
-    // Set the values
-    setSummaryValue("fixaemployee", ficaTaxTotalIndividual);
-    setSummaryValue("medicareemployee", medicareTaxTotalIndividual);
-    setSummaryValue("employeeTotal", ficaTaxTotalIndividual + medicareTaxTotalIndividual);
-    setSummaryValue("ficaEmployer", ficaTaxTotalEmployer);
-    setSummaryValue("medicareEmployer",medicareTaxTotalEmployer );
-    setSummaryValue("employerTotal", ficaTaxTotalEmployer + medicareTaxTotalEmployer);
-    setSummaryValue("fixaTotal", ficaTaxTotalIndividual + ficaTaxTotalEmployer);
-    setSummaryValue("medicareTotal", medicareTaxTotalIndividual + medicareTaxTotalEmployer);
-    setSummaryValue("grandTotal", ficaTaxTotalIndividual + medicareTaxTotalIndividual + ficaTaxTotalEmployer + medicareTaxTotalEmployer);
-
 }
 

@@ -95,9 +95,17 @@ td {
 }
 
 #earningsTable .top35 {
-    background-color: lightgreen;
-    border-color:rgb(107, 79, 246);
-    border-style: solid;
+  background-color: rgb(125, 196, 125);
+}
+
+.top35 {
+  background-color: rgb(125, 196, 125);
+}
+
+.top35 .AWI:before {
+  color: red;
+  content: '\2605  ';
+  display:inline;
 }
 
 div.dt-buttons{
@@ -123,7 +131,7 @@ p {
 #statistics p {
   font-size: 1.25rem;
   line-height: 1.5rem;
-  text-indent: 40px;
+  margin-left: 40px;
 }
 
 hr {
@@ -178,10 +186,6 @@ hr {
     text-indent: 50px;
   }
 
-  .same {
-    opacity: .3;
-  }
-
   .number {
     font-weight: bold;
   }
@@ -196,6 +200,14 @@ hr {
     border-bottom: 1px dotted black;
   }
   
+  #earningsChart {
+    margin:80px;
+  }
+
+  #bensChart {
+    margin:80px;
+  }
+
   .ui-tabs-vertical { width: 55em; }
   .ui-tabs-vertical .ui-tabs-nav { padding: .2em .1em .2em .2em; float: left; width: 12em; }
   .ui-tabs-vertical .ui-tabs-nav li { clear: left; width: 100%; border-bottom-width: 1px !important; border-right-width: 0 !important; margin: 0 -1px .2em 0; }
@@ -204,20 +216,20 @@ hr {
   .ui-tabs-vertical .ui-tabs-panel { padding: 1em; float: right; width: 40em;}
 
   .color0 {
-    background-color: #d5ed9c;
+    background-color: #F0FFF0;
   }
   .color1 {
-    background-color: #9abb78;
+    background-color: #F5FFFA;
   }
   .color2 {
-    background-color: #7abe5d;
+    background-color: #F0FFFF;
   }
   .color3 {
-    background-color: #6bbd61;
+    background-color: #E0FFFF;
   }
   .color4 {
-    background-color: #58b763;
+    background-color: #AFEEEE;
   }
   .color5 {
-    background-color: #1faf43;
+    background-color: #20B2AA;
   }
