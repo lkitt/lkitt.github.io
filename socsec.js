@@ -15,6 +15,7 @@ var medicareMap = new Map();
 var ficaMap = new Map();
 var adjustedFicaMap = new Map();
 var predictedFicaMap = new Map();
+var totalTaxesPaid = 0;
 
 const formatter7 = new Intl.NumberFormat('en-US', {
     minimumFractionDigits: 0,
@@ -61,6 +62,133 @@ const maxTaxedIncome = new Map([
     [2010,106800], [2011,106800], [2012,110100], [2013,113700], [2014,117000], [2015,118500], [2016,118500], [2017,127200], [2018,128400], [2019,132900],
     [2020,137700], [2021,142800], [2022,147000], [2023,160200], [2024,160200],
 ]);
+
+// https://www.ssa.gov/oact/STATS/table4c6.html
+// exact age, male death probability (a), male num lives (b), male life expectancy, female death probability (a), female num lives (b), female life expectancy,
+// a) Probability of dying within one year.
+// b) Number of survivors out of 100,000 born alive.
+const lifeExpectancy = [
+    [0,0.005837,100000,74.12,0.004907,100000,79.78],
+    [1,0.000410,99416,73.55,0.000316,99509,79.17],
+    [2,0.000254,99376,72.58,0.000196,99478,78.19],
+    [3,0.000207,99350,71.60,0.000160,99458,77.21],
+    [4,0.000167,99330,70.62,0.000129,99442,76.22],
+    [5,0.000141,99313,69.63,0.000109,99430,75.23],
+    [6,0.000123,99299,68.64,0.000100,99419,74.24],
+    [7,0.000113,99287,67.65,0.000096,99409,73.25],
+    [8,0.000108,99276,66.65,0.000092,99399,72.25],
+    [9,0.000114,99265,65.66,0.000089,99390,71.26],
+    [10,0.000127,99254,64.67,0.000092,99381,70.27],
+    [11,0.000146,99241,63.68,0.000104,99372,69.27],
+    [12,0.000174,99227,62.69,0.000123,99362,68.28],
+    [13,0.000228,99209,61.70,0.000145,99349,67.29],
+    [14,0.000312,99187,60.71,0.000173,99335,66.30],
+    [15,0.000435,99156,59.73,0.000210,99318,65.31],
+    [16,0.000604,99113,58.76,0.000257,99297,64.32],
+    [17,0.000814,99053,57.79,0.000314,99271,63.34],
+    [18,0.001051,98972,56.84,0.000384,99240,62.36],
+    [19,0.001250,98868,55.90,0.000440,99202,61.38],
+    [20,0.001398,98745,54.97,0.000485,99159,60.41],
+    [21,0.001524,98607,54.04,0.000533,99111,59.44],
+    [22,0.001612,98456,53.12,0.000574,99058,58.47],
+    [23,0.001682,98298,52.21,0.000617,99001,57.50],
+    [24,0.001747,98132,51.30,0.000655,98940,56.54],
+    [25,0.001812,97961,50.39,0.000700,98875,55.58],
+    [26,0.001884,97783,49.48,0.000743,98806,54.61],
+    [27,0.001974,97599,48.57,0.000796,98732,53.66],
+    [28,0.002070,97406,47.66,0.000851,98654,52.70],
+    [29,0.002172,97205,46.76,0.000914,98570,51.74],
+    [30,0.002275,96994,45.86,0.000976,98480,50.79],
+    [31,0.002368,96773,44.97,0.001041,98383,49.84],
+    [32,0.002441,96544,44.07,0.001118,98281,48.89],
+    [33,0.002517,96308,43.18,0.001186,98171,47.94],
+    [34,0.002590,96066,42.29,0.001241,98055,47.00],
+    [35,0.002673,95817,41.39,0.001306,97933,46.06],
+    [36,0.002791,95561,40.50,0.001386,97805,45.12],
+    [37,0.002923,95294,39.62,0.001472,97670,44.18],
+    [38,0.003054,95016,38.73,0.001549,97526,43.24],
+    [39,0.003207,94725,37.85,0.001637,97375,42.31],
+    [40,0.003333,94422,36.97,0.001735,97215,41.38],
+    [41,0.003464,94107,36.09,0.001850,97047,40.45],
+    [42,0.003587,93781,35.21,0.001950,96867,39.52],
+    [43,0.003735,93445,34.34,0.002072,96678,38.60],
+    [44,0.003911,93096,33.46,0.002217,96478,37.68],
+    [45,0.004137,92732,32.59,0.002383,96264,36.76],
+    [46,0.004452,92348,31.73,0.002573,96035,35.85],
+    [47,0.004823,91937,30.87,0.002777,95788,34.94],
+    [48,0.005214,91493,30.01,0.002984,95522,34.04],
+    [49,0.005594,91016,29.17,0.003210,95237,33.14],
+    [50,0.005998,90507,28.33,0.003476,94931,32.24],
+    [51,0.006500,89964,27.50,0.003793,94601,31.35],
+    [52,0.007081,89380,26.67,0.004136,94242,30.47],
+    [53,0.007711,88747,25.86,0.004495,93852,29.59],
+    [54,0.008394,88062,25.06,0.004870,93430,28.72],
+    [55,0.009109,87323,24.27,0.005261,92975,27.86],
+    [56,0.009881,86528,23.48,0.005714,92486,27.01],
+    [57,0.010687,85673,22.71,0.006227,91958,26.16],
+    [58,0.011566,84757,21.95,0.006752,91385,25.32],
+    [59,0.012497,83777,21.21,0.007327,90768,24.49],
+    [60,0.013485,82730,20.47,0.007926,90103,23.67],
+    [61,0.014595,81614,19.74,0.008544,89389,22.85],
+    [62,0.015702,80423,19.03,0.009173,88625,22.04],
+    [63,0.016836,79160,18.32,0.009841,87812,21.24],
+    [64,0.017908,77828,17.63,0.010529,86948,20.45],
+    [65,0.018943,76434,16.94,0.011265,86032,19.66],
+    [66,0.020103,74986,16.26,0.012069,85063,18.88],
+    [67,0.021345,73479,15.58,0.012988,84037,18.10],
+    [68,0.022750,71910,14.91,0.014032,82945,17.34],
+    [69,0.024325,70274,14.24,0.015217,81781,16.58],
+    [70,0.026137,68565,13.59,0.016634,80537,15.82],
+    [71,0.028125,66773,12.94,0.018294,79197,15.08],
+    [72,0.030438,64895,12.30,0.020175,77748,14.36],
+    [73,0.033249,62919,11.67,0.022321,76180,13.64],
+    [74,0.036975,60827,11.05,0.025030,74479,12.94],
+    [75,0.040633,58578,10.46,0.027715,72615,12.26],
+    [76,0.044710,56198,9.88,0.030631,70603,11.60],
+    [77,0.049152,53685,9.32,0.033900,68440,10.95],
+    [78,0.054265,51047,8.77,0.037831,66120,10.31],
+    [79,0.059658,48277,8.25,0.042249,63618,9.70],
+    [80,0.065568,45397,7.74,0.047148,60931,9.10],
+    [81,0.072130,42420,7.25,0.052545,58058,8.53],
+    [82,0.079691,39360,6.77,0.058685,55007,7.98],
+    [83,0.088578,36224,6.31,0.065807,51779,7.44],
+    [84,0.098388,33015,5.88,0.074052,48372,6.93],
+    [85,0.109139,29767,5.47,0.083403,44790,6.44],
+    [86,0.120765,26518,5.07,0.093798,41054,5.99],
+    [87,0.133763,23316,4.70,0.104958,37203,5.55],
+    [88,0.148370,20197,4.35,0.117435,33299,5.15],
+    [89,0.164535,17200,4.02,0.131540,29388,4.76],
+    [90,0.182632,14370,3.72,0.146985,25522,4.41],
+    [91,0.202773,11746,3.44,0.163592,21771,4.08],
+    [92,0.223707,9364,3.18,0.181562,18209,3.78],
+    [93,0.245124,7269,2.96,0.200724,14903,3.51],
+    [94,0.266933,5487,2.75,0.219958,11912,3.27],
+    [95,0.288602,4023,2.57,0.239460,9292,3.05],
+    [96,0.309781,2862,2.42,0.258975,7067,2.85],
+    [97,0.330099,1975,2.28,0.278225,5237,2.68],
+    [98,0.349177,1323,2.15,0.296912,3780,2.52],
+    [99,0.366635,861,2.04,0.314727,2657,2.37],
+    [100,0.384967,545,1.93,0.333610,1821,2.23],
+    [101,0.404215,335,1.83,0.353627,1214,2.09],
+    [102,0.424426,200,1.73,0.374844,784,1.96],
+    [103,0.445648,115,1.63,0.397335,490,1.84],
+    [104,0.467930,64,1.54,0.421175,296,1.72],
+    [105,0.491326,34,1.45,0.446446,171,1.61],
+    [106,0.515893,17,1.36,0.473232,95,1.50],
+    [107,0.541687,8,1.28,0.501626,50,1.40],
+    [108,0.568772,4,1.20,0.531724,25,1.30],
+    [109,0.597210,2,1.13,0.563627,12,1.21],
+    [110,0.627071,1,1.05,0.597445,5,1.12],
+    [111,0.658424,0,0.98,0.633292,2,1.03],
+    [112,0.691346,0,0.92,0.671289,1,0.95],
+    [113,0.725913,0,0.85,0.711567,0,0.88],
+    [114,0.762209,0,0.79,0.754261,0,0.80],
+    [115,0.800319,0,0.74,0.799516,0,0.74],
+    [116,0.840335,0,0.68,0.840335,0,0.68],
+    [117,0.882352,0,0.63,0.882352,0,0.63],
+    [118,0.926469,0,0.58,0.926469,0,0.58],
+    [119,0.972793,0,0.53,0.972793,0,0.53],
+];
 
 class YearInfo {
     constructor(year, fica, medicare) {
@@ -149,13 +277,13 @@ function getEstimatedBenefits(aime)
     let total = 0;
     if ( aime > firstCut)
     {
-        // Exceeds firstCut, so set total to 90% of first cut.
+        // Exceeds firstCut, so start with 90% of first cut.
         total = 0.9 * firstCut;
         if ( aime > secondCut )
         {
             if ( aime > secondCut )
             {
-                // Greater than second cut, so set total to 32% of second cut, and 15% of third cut
+                // Greater than second cut, so set total to 32% of amount between first and second cuts, and 15% of remaining
                 total += (secondCut - firstCut) * .32;
                 total += (aime - secondCut) * .15;
             }
@@ -164,6 +292,11 @@ function getEstimatedBenefits(aime)
                 // More then first, but less than second.  Substract first from aime and multiply by 32%
                 total += (aime - firstCut) * .32;
             }
+        }
+        else
+        {
+            // Greater than first, but less than second.
+            total += (aime - firstCut) * .32;
         }
     }
     else
@@ -222,7 +355,7 @@ function addRowToBenefitsTable(benefitsTable, age, lastIncome, sortedFica)
     var inputCell = document.createElement("INPUT");
     inputCell.classList.add("estimatedFICA");
     inputCell.setAttribute("type", "number");
-    inputCell.setAttribute("value", lastIncome);
+    inputCell.setAttribute("value", Math.trunc(lastIncome));
     inputCell.setAttribute("maxLength", 6);
     inputCell.setAttribute("max", maxTaxedIncome.get(lastYear));
     inputCell.setAttribute("year", year);
@@ -257,7 +390,15 @@ function addRowToBenefitsTable(benefitsTable, age, lastIncome, sortedFica)
         if ( yearly < minSS ) minSS = yearly;
         if ( yearly > maxSS ) maxSS = yearly;
     }
-
+    
+    let minClaimAge = 62;
+    let currentAge = new Date().getFullYear() - birthDate.getFullYear();
+    if ( currentAge > 62 )
+    {
+        minClaimAge = currentAge;
+        minSS = Math.floor((benefits.get(minClaimAge) * 12));
+    }
+    document.getElementById("claimAge").innerHTML = minClaimAge;
     document.getElementById("minSS").innerHTML = minSS.toLocaleString("en-US", {style:"currency", currency:"USD", maximumFractionDigits:"0"});
     document.getElementById("lastYear").innerHTML = earningsHistory.get(lastYear).ficaAdjusted.toLocaleString("en-US", {style:"currency", currency:"USD", maximumFractionDigits:"0"});
     document.getElementById("maxSS").innerHTML = maxSS.toLocaleString("en-US", {style:"currency", currency:"USD", maximumFractionDigits:"0"});
@@ -286,8 +427,8 @@ function addEstimatedBenefitsTable(sortedFica)
     // Trim the sortedFica map until it has no more than 35 entries
     while ( sortedFica.size > 35 )
     {
-        let lastYear = [...sortedFica][sortedFica.size-1][0];
-        sortedFica.delete(lastYear);
+        let lastYearIdx = [...sortedFica][sortedFica.size-1][0];
+        sortedFica.delete(lastYearIdx);
     }
     let curYear = new Date().getFullYear();
     let testYear = curYear - 1;
@@ -310,7 +451,6 @@ function addEstimatedBenefitsTable(sortedFica)
     benefitsTable.innerHTML = "";
 
     let caption = benefitsTable.createCaption();
-    let lastYearSalary =  earningsHistory.get(lastYear).ficaAdjusted.toLocaleString("en-US", {style:"currency", currency:"USD", maximumFractionDigits:"0"});
     caption.textContent = "Estimated benefits based on Age Clamied by Last Working Year/Age (Assuming future FICA earnings as shown below)";
     var tableBody = document.createElement("TBODY");
     benefitsTable.appendChild(tableBody);
@@ -357,6 +497,7 @@ function addEstimatedBenefitsTable(sortedFica)
     for (let claimedAge = 62; claimedAge <= 70; claimedAge++)
     {
         th = document.createElement("TH");
+        th.setAttribute("claimedAge", claimedAge);
         cell = document.createTextNode(claimedAge);
         th.appendChild(cell);
         secondRow.appendChild(th);
@@ -411,7 +552,7 @@ function addEstimatedBenefitsTable(sortedFica)
     var rows = document.querySelectorAll("#estimatedBenefits tr");
 
     for (var row of rows) {
-        row.addEventListener('click', marker)
+        row.addEventListener('click', rowClicked)
     }
 
     function drawCumulativeLineChart(benAmounts, year)
@@ -422,20 +563,21 @@ function addEstimatedBenefitsTable(sortedFica)
         function drawLineChart()
         {
             var data = new google.visualization.DataTable();
-            data.addColumn('number', 'Age');
-            data.addColumn('number', '62');
-            data.addColumn('number', '63');
-            data.addColumn('number', '64');
-            data.addColumn('number', '65');
-            data.addColumn('number', '66');
-            data.addColumn('number', '67');
-            data.addColumn('number', '68');
-            data.addColumn('number', '69');
-            data.addColumn('number', '70');
+            data.addColumn('number', 'Claim Age');
+            data.addColumn('number', 'Claimed at 62');
+            data.addColumn('number', 'Claimed at 63');
+            data.addColumn('number', 'Claimed at 64');
+            data.addColumn('number', 'Claimed at 65');
+            data.addColumn('number', 'Claimed at 66');
+            data.addColumn('number', 'Claimed at 67');
+            data.addColumn('number', 'Claimed at 68');
+            data.addColumn('number', 'Claimed at 69');
+            data.addColumn('number', 'Claimed at 70');
+            data.addColumn('number', 'Taxes Paid');
 
             let firstYear = birthDate.getFullYear() + 62;
-            let lastYear = birthDate.getFullYear() + 100;
-            for ( let curYear = firstYear; curYear <= lastYear; curYear++ )
+            let lastYearPlotted = birthDate.getFullYear() + 100;
+            for ( let curYear = firstYear; curYear <= lastYearPlotted; curYear++ )
             {
                 let multiplier = curYear - firstYear + 1;
                 let curData = [];
@@ -447,6 +589,7 @@ function addEstimatedBenefitsTable(sortedFica)
                         cum = null;
                     curData.push(cum);
                 }
+                curData.push(totalTaxesPaid);
                 data.addRow(curData);
             }
 
@@ -476,8 +619,7 @@ function addEstimatedBenefitsTable(sortedFica)
         }
     }
 
-    function marker() {
-        // TODO: Add handler to highlight row, draw chart.
+    function rowClicked() {
         let yearStr = this.getAttribute("year");
         if ( yearStr !== null )
         {
@@ -504,6 +646,8 @@ function parseXMLFile(xml) {
     ficaMap.clear();
     adjustedFicaMap.clear();
     predictedFicaMap.clear();
+    bensChart.innerHTML = "";
+    lastYear = 0;
 
     parser = new DOMParser();
     xmlDoc = parser.parseFromString(xml,"text/xml");
@@ -522,6 +666,7 @@ function parseXMLFile(xml) {
     if ( userInformation.length === 1 ) {
         let user = userInformation[0].getElementsByTagName("osss:Name");
         userName = user[0].childNodes[0].data;
+        setSummaryValue("summaryHeading", "Summary for " + userName);
         if ( userName.length > 0 )
         {
             userName = "Earnings History for " + userName;
@@ -581,7 +726,22 @@ function parseXMLFile(xml) {
 
         // Create a sorted Indexed FICA Earnings map
         const sortedFica = new Map([...adjustedFicaMap.entries()].sort((a, b) => b[1] - a[1]));
-        addEstimatedBenefitsTable(sortedFica);
+        let age = new Date().getFullYear() - birthDate.getFullYear();
+        if ( age < 70 )
+        {
+            addEstimatedBenefitsTable(sortedFica);
+            if ( birthDate.getFullYear() < 1960 )
+                document.getElementById("full67").style.display = "block";
+            else
+                document.getElementById("full67").style.display = "none";
+            document.getElementById("click67").style.display = "block";
+        }
+        else
+        {
+            // Hide this text, doesn't apply to people aged 70 and above already.
+            document.getElementById("full67").style.display = "none";
+            document.getElementById("click67").style.display = "none";
+        }
 
         // Create a sorted Medicare Earnings map
         const sortedMedicare = new Map([...adjustedMedicareMap.entries()].sort((a, b) => b[1] - a[1]));
@@ -619,28 +779,33 @@ function parseXMLFile(xml) {
             document.getElementById("firstCut").innerHTML = (0.9 * firstCut).toLocaleString("en-US", {style:"currency", currency:"USD", maximumFractionDigits:"0"});
             if ( aime > secondCut )
             {
-                if ( aime > secondCut )
-                {
-                    total += (secondCut - firstCut) * .32;
-                    document.getElementById("secondCut").innerHTML = ((secondCut - firstCut) * .32).toLocaleString("en-US", {style:"currency", currency:"USD", maximumFractionDigits:"0"});
-                    total += (aime - secondCut) * .15;
-                    document.getElementById("finalCut").innerHTML = ((aime - secondCut) * .15).toLocaleString("en-US", {style:"currency", currency:"USD", maximumFractionDigits:"0"});
-                }
-                else
-                {
-                    document.getElementById("secondCut").innerHTML = ((aime - firstCut) * .32).toLocaleString("en-US", {style:"currency", currency:"USD", maximumFractionDigits:"0"});
-                    total += (aime - firstCut) * .32;
-                }
+                total += (secondCut - firstCut) * .32;
+                document.getElementById("secondCut").innerHTML = ((secondCut - firstCut) * .32).toLocaleString("en-US", {style:"currency", currency:"USD", maximumFractionDigits:"0"});
+                total += (aime - secondCut) * .15;
+                document.getElementById("finalCut").innerHTML = ((aime - secondCut) * .15).toLocaleString("en-US", {style:"currency", currency:"USD", maximumFractionDigits:"0"});
+            }
+            else
+            {
+                // Greater than fist cut, but less than second cut.
+                total += (aime - firstCut) * .32;
+                document.getElementById("secondCut").innerHTML = ((aime - firstCut) * .32).toLocaleString("en-US", {style:"currency", currency:"USD", maximumFractionDigits:"0"});
+                document.getElementById("finalCut").innerHTML = (0).toLocaleString("en-US", {style:"currency", currency:"USD", maximumFractionDigits:"0"});
             }
         }
         else
         {
             total = 0.9 * aime;
             document.getElementById("firstCut").innerHTML = (aime * 0.9).toLocaleString("en-US", {style:"currency", currency:"USD", maximumFractionDigits:"0"});
-        }
+            document.getElementById("secondCut").innerHTML = (0).toLocaleString("en-US", {style:"currency", currency:"USD", maximumFractionDigits:"0"});
+            document.getElementById("finalCut").innerHTML = (0).toLocaleString("en-US", {style:"currency", currency:"USD", maximumFractionDigits:"0"});
+    }
 
         document.getElementById("pia").innerHTML = total.toLocaleString("en-US", {style:"currency", currency:"USD", maximumFractionDigits:"0"});
         document.getElementById("piay").innerHTML = (Math.floor(total) * 12).toLocaleString("en-US", {style:"currency", currency:"USD", maximumFractionDigits:"0"});
+
+        let ficaTaxTotalEmployer = Number(earningsRecords[0].getElementsByTagName("osss:FicaTaxTotalEmployer")[0].childNodes[0].data);
+        let ficaTaxTotalIndividual = Number(earningsRecords[0].getElementsByTagName("osss:FicaTaxTotalIndividual")[0].childNodes[0].data);
+        totalTaxesPaid = ficaTaxTotalEmployer + ficaTaxTotalIndividual;
 
         $( "#tabs" ).tabs( "enable", "#Summary" );
         $( "#tabs" ).tabs( "enable", "#TaxesPaid" );
@@ -660,6 +825,7 @@ function parseXMLFile(xml) {
                     let ficaTaxTotalIndividual = Number(earningsRecords[0].getElementsByTagName("osss:FicaTaxTotalIndividual")[0].childNodes[0].data);
                     let medicareTaxTotalEmployer = Number(earningsRecords[0].getElementsByTagName("osss:MedicareTaxTotalEmployer")[0].childNodes[0].data);
                     let medicareTaxTotalIndividual = Number(earningsRecords[0].getElementsByTagName("osss:MedicareTaxTotalIndividual")[0].childNodes[0].data);
+                    totalTaxesPaid = ficaTaxTotalEmployer + ficaTaxTotalIndividual;
                     document.getElementById("taxTable").style.visibility = "visible";
 
                     // Set the summary values
@@ -1075,6 +1241,15 @@ function timeUntil(futureDate) {
     return " (in " + yearStr + (diff.getMonth()+1) + " months, " + diff.getDate() + " days)";
 }
 
+function timeSince(pastDate) {
+
+    var diff = new Date(new Date() - pastDate);
+    let yearStr = "";
+    if ( diff.getFullYear() > 1970 )
+        yearStr = (diff.toISOString().slice(0, 4) - 1970) + " years ";
+    return " (" + yearStr + (diff.getMonth()+1) + " months, " + diff.getDate() + " days ago)";
+}
+
 function setSummaryValue(docId, value)
 {
     document.getElementById(docId).innerHTML = value.toLocaleString("en-US", {style:"currency", currency:"USD", maximumFractionDigits:"0"});
@@ -1170,6 +1345,24 @@ function drawIncomeHistoryChart()
     }
 }
 
+
+function getExpectedLife(yearsLeft)
+{
+    let decimal = yearsLeft % 1;
+    let days = decimal * 365;
+    
+    Date.prototype.addDays = function(days) {
+        this.setDate(this.getDate() + parseInt(days));
+        return this;
+    };
+
+    var expireDate = new Date();
+    expireDate.addDays(days + (365 * Math.trunc(yearsLeft)));
+
+    let timeLeft = timeUntil(expireDate);
+    return expireDate.toDateString() + " at age " + (expireDate.getFullYear() - birthDate.getFullYear()) + " " + timeLeft;
+   
+}
 
 function createStatisticsOutput(statisticsDiv, xmlDoc, fica, sortedMedicareAdjusted, medicareMap) {
 
@@ -1295,11 +1488,45 @@ function createStatisticsOutput(statisticsDiv, xmlDoc, fica, sortedMedicareAdjus
 
     const today = new Date();
     const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-    let togo = timeUntil(firstEligibleDate, today);
-    document.getElementById("eligible62Date").innerHTML = firstEligibleDate.toLocaleDateString(undefined, options);
-    document.getElementById("eligible62Diff").innerHTML = togo;
-    togo = timeUntil(lastEligibleDate, today);
-    document.getElementById("eligible70Date").innerHTML = lastEligibleDate.toLocaleDateString(undefined, options);
-    document.getElementById("eligible70Diff").innerHTML = togo;
+    let togo = timeUntil(firstEligibleDate);
+    if ( today.getFullYear() - bYear < 70 )
+    {
+        // Display this information
+        document.getElementById("maxPossible").style.display = "block";
+        document.getElementById("priorStop").style.display = "block";
+        document.getElementById("seventyStop").style.display = "block";
+        if ( today.getFullYear() - bYear > 62 )
+        {
+            togo = timeSince(firstEligibleDate);
+            document.getElementById("eligible62PastDate").innerHTML = firstEligibleDate.toLocaleDateString(undefined, options);
+            document.getElementById("eligiblePast62Diff").innerHTML = togo;
+            document.getElementById("eligibleFuture").style.display = "none";
+            document.getElementById("eligiblePast").style.display = "block";
+        }
+        else
+        {
+            document.getElementById("eligible62Date").innerHTML = firstEligibleDate.toLocaleDateString(undefined, options);
+            document.getElementById("eligible62Diff").innerHTML = togo;
+            document.getElementById("eligiblePast").style.display = "none";
+            document.getElementById("eligibleFuture").style.display = "block";
+        }
+        togo = timeUntil(lastEligibleDate);
+        document.getElementById("eligible70Date").innerHTML = lastEligibleDate.toLocaleDateString(undefined, options);
+        document.getElementById("eligible70Diff").innerHTML = togo;
+    }
+    else
+    {
+        // Hide this information
+        document.getElementById("eligibleFuture").style.display = "none";
+        document.getElementById("eligiblePast").style.display = "none";
+        document.getElementById("maxPossible").style.display = "none";
+        document.getElementById("priorStop").style.display = "none";
+        document.getElementById("seventyStop").style.display = "none";
+    }
+
+    let curAge = new Date().getFullYear() - bYear;
+    document.getElementById("maleLife").innerHTML = getExpectedLife(lifeExpectancy[curAge][3]);
+    document.getElementById("femaleLife").innerHTML = getExpectedLife(lifeExpectancy[curAge][6]);
+
 }
 
